@@ -147,6 +147,26 @@ User::query(true)->where('gender', '>', 1)->delete();
 
 對於這種情況，我們可以修改 `use_default_value` 為 `true`，並新增 `Hyperf\DbConnection\Listener\InitTableCollectorListener` 到 `listener.php` 配置中，使 Hyperf 應用在啟動時主動去獲取資料庫的欄位資訊，並在獲取快取資料時與之比較並進行快取資料修正。
 
+### 控制模型中快取時間
+
+除了 `database.php` 中配置的預設快取時間 `ttl` 外，`Hyperf\ModelCache\Cacheable` 支援對模型配置更細的快取時間：
+
+```php
+class User extends Model implements CacheableInterface
+{
+    use Cacheable;
+    
+    /**
+     * 快取 10 分鐘，返回 null 則使用配置檔案中設定的超時時間
+     * @return int|null
+     */
+    public function getCacheTTL(): ?int
+    {
+        return 600;
+    }
+}
+```
+
 ### EagerLoad
 
 當我們使用模型關係時，可以通過 `load` 解決 `N+1` 的問題，但仍然需要查一次資料庫。模型快取通過重寫了 `ModelBuilder`，可以讓使用者儘可能的從快取中拿到對應的模型。
@@ -190,3 +210,17 @@ foreach ($books as $book){
     var_dump($book->user);
 }
 ```
+
+### 快取介面卡
+
+您可以根據自己的實際情況實現快取介面卡，只需要實現介面 `Hyperf\ModelCache\Handler\HandlerInterface` 即可。
+
+框架提供了兩個 Handler 可供選擇：
+
+- Hyperf\ModelCache\Handler\RedisHandler
+
+使用 `HASH` 儲存快取，可以有效的處理 `Model::increament()`，不足是因為資料型別只有 `String`，所以對 `null` 支援較差。
+
+- Hyperf\ModelCache\Handler\RedisStringHandler
+
+使用 `String` 儲存快取，因為是序列化的資料，所以支援所有資料型別，不足是無法有效處理 `Model::increament()`，當模型呼叫累加時，通過刪除快取，解決一致性的問題。

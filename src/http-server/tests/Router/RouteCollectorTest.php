@@ -25,7 +25,7 @@ use PHPUnit\Framework\TestCase;
  */
 class RouteCollectorTest extends TestCase
 {
-    protected function tearDown()
+    protected function tearDown(): void
     {
         Mockery::close();
         MiddlewareManager::$container = [];
@@ -49,6 +49,15 @@ class RouteCollectorTest extends TestCase
         $this->assertSame('Handler::ApiGet', $data['GET']['/api/']->callback);
         $this->assertSame('Handler::Post', $data['POST']['/']->callback);
         $this->assertSame('Handler::ApiPost', $data['POST']['/api/']->callback);
+    }
+
+    public function testGetRouteParser()
+    {
+        $parser = new Std();
+        $generator = new DataGenerator();
+        $collector = new RouteCollector($parser, $generator);
+
+        $this->assertSame($parser, $collector->getRouteParser());
     }
 
     public function testAddGroupMiddleware()
@@ -120,5 +129,23 @@ class RouteCollectorTest extends TestCase
 
         $res = $collector->mergeOptions($origin, $options);
         $this->assertSame(['A', 'B', 'C', 'B'], $res['middleware']);
+    }
+
+    public function testMiddlewareInOptionalRoute()
+    {
+        $parser = new Std();
+        $generator = new DataGenerator();
+        $collector = new RouteCollectorStub($parser, $generator, 'test');
+
+        $routes = [
+            '/user/[{id:\d+}]',
+            '/role/{id:\d+}',
+            '/user',
+        ];
+
+        foreach ($routes as $route) {
+            $collector->addRoute('GET', $route, 'User::Info', ['middleware' => $middlewares = ['FooMiddleware']]);
+            $this->assertSame($middlewares, MiddlewareManager::get('test', $route, 'GET'));
+        }
     }
 }
